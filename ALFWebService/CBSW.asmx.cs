@@ -62,7 +62,7 @@ namespace ALFWebService
         /// <summary>
         /// 销售出库单
         /// </summary>
-        /// <param name="pHead">表头：FDeptID|FSManagerID|FFManagerID|FBillerID|FSEOrderBillNo|FNote</param>
+        /// <param name="pHead">表头：FDeptID|FSManagerID|FFManagerID|FBillerID|FSourceBillNo|FNote</param>
         /// <param name="pDetails">表体：[FItemNumber|FDCStockNumber|FDCSPNumber|FBatchNo|FQty|FSourceBillNo|FNote],......</param>
         /// <returns>yes@ID:xxxx;Number:xxxx/no@ExceptionMessage</returns>
         [WebMethod]
