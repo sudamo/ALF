@@ -130,14 +130,34 @@ namespace ALFWebService
                         }
                         break;
                     case 29://其他出库
-                        for (int i = 0; i < dt.Rows.Count; i++)
                         {
-                            if (dt.Rows[i]["FDCSPID"] == null || dt.Rows[i]["FDCSPID"].ToString() == "0")
-                                strSQL = "UPDATE ICInventory SET FQty = FQty - " + dt.Rows[i]["FQty"].ToString() + " WHERE FItemID = " + dt.Rows[i]["FItemID"].ToString() + " AND FBatchNo = '" + dt.Rows[i]["FBatchNo"].ToString() + "' AND FStockID = " + dt.Rows[i]["FDCStockID"].ToString();
-                            else
-                                strSQL = "UPDATE ICInventory SET FQty = FQty - " + dt.Rows[i]["FQty"].ToString() + " WHERE FItemID = " + dt.Rows[i]["FItemID"].ToString() + " AND FBatchNo = '" + dt.Rows[i]["FBatchNo"].ToString() + "' AND FStockID = " + dt.Rows[i]["FDCStockID"].ToString() + " AND FStockPlaceID = " + dt.Rows[i]["FDCSPID"].ToString();
+                            //对即时库存的判断
+                            for (int i = 0; i < dt.Rows.Count; i++)
+                            {
+                                if (dt.Rows[i]["FDCSPID"] == null || dt.Rows[i]["FDCSPID"].ToString() == "0")
+                                    strSQL = "SELECT FQty FROM ICInventory WHERE FItemID = " + dt.Rows[i]["FItemID"].ToString() + " AND FStockID = " + dt.Rows[i]["FDCStockID"].ToString() + " AND FBatchNo = '" + dt.Rows[i]["FBatchNo"].ToString() + "'";
+                                else
+                                    strSQL = "SELECT FQty FROM ICInventory WHERE FItemID = " + dt.Rows[i]["FItemID"].ToString() + " AND FStockID = " + dt.Rows[i]["FDCStockID"].ToString() + " AND FStockPlaceID = " + dt.Rows[i]["FDCSPID"].ToString() + " AND FBatchNo = '" + dt.Rows[i]["FBatchNo"].ToString() + "'";
 
-                            SqlOperation(0, strSQL);
+                                obj = SqlOperation(1, strSQL);
+
+                                if (obj == null)
+                                    return "审核失败：" + "物料[" + dt.Rows[i]["FItem"].ToString() + "]未能匹配到即时库存";
+
+                                if ((decimal)obj < decimal.Parse(dt.Rows[i]["FQty"].ToString()))
+                                    return "审核失败：" + "物料[" + dt.Rows[i]["FItem"].ToString() + "]即时库存[" + ((decimal)obj).ToString() + "]小于出库数量[" + dt.Rows[i]["FQty"].ToString() + "]";
+                            }
+
+                            //反写库存
+                            for (int i = 0; i < dt.Rows.Count; i++)
+                            {
+                                if (dt.Rows[i]["FDCSPID"] == null || dt.Rows[i]["FDCSPID"].ToString() == "0")
+                                    strSQL = "UPDATE ICInventory SET FQty = FQty - " + dt.Rows[i]["FQty"].ToString() + " WHERE FItemID = " + dt.Rows[i]["FItemID"].ToString() + " AND FBatchNo = '" + dt.Rows[i]["FBatchNo"].ToString() + "' AND FStockID = " + dt.Rows[i]["FDCStockID"].ToString();
+                                else
+                                    strSQL = "UPDATE ICInventory SET FQty = FQty - " + dt.Rows[i]["FQty"].ToString() + " WHERE FItemID = " + dt.Rows[i]["FItemID"].ToString() + " AND FBatchNo = '" + dt.Rows[i]["FBatchNo"].ToString() + "' AND FStockID = " + dt.Rows[i]["FDCStockID"].ToString() + " AND FStockPlaceID = " + dt.Rows[i]["FDCSPID"].ToString();
+
+                                SqlOperation(0, strSQL);
+                            }
                         }
                         break;
                         //default:
@@ -956,8 +976,12 @@ namespace ALFWebService
 
             conn = new SqlConnection(C_CONNECTIONSTRING);
 
-            //销售订单：SEOutStock
-            int FOrgBillInterID, FSEOutStockInterID, FSEOutStockEntryID;
+            //销售订单：SEOrder
+            string SEOrderBillNo;
+            int SEOrderInterID, SEOrderEntryID;
+
+            //发货通知单：SEOutStock
+            int FOrgBillInterID, FSEOutStockInterID, FSEOutStockEntryID, FCustID;
 
             //定义表头字段
             string FNote, FSEOutStockBillNo;
@@ -987,12 +1011,13 @@ namespace ALFWebService
                 //
                 FNote = pHead.Substring(pHead.IndexOf("|") + 1);//FNote
                 
-                obj = SqlOperation(3, "SELECT FInterID,FClosed FROM SEOutStock WHERE FBillNo = '" + FSEOutStockBillNo + "'");
+                obj = SqlOperation(3, "SELECT FInterID,FClosed,FCustID FROM SEOutStock WHERE FBillNo = '" + FSEOutStockBillNo + "'");
                 if (obj == null || ((DataTable)obj).Rows.Count == 0)
                     return "no@没有此单据数据[" + FSEOutStockBillNo + "]";
 
                 //FConsignee = ((DataTable)obj).Rows[0]["FConsignee"].ToString();//收货方
                 FOrgBillInterID = int.Parse(((DataTable)obj).Rows[0]["FInterID"].ToString());
+                FCustID = int.Parse(((DataTable)obj).Rows[0]["FCustID"].ToString());
 
                 //源单关闭、审核和作废状态的判断-未做判断
 
@@ -1016,6 +1041,9 @@ namespace ALFWebService
                 dtDtl.Columns.Add("FNote");
                 dtDtl.Columns.Add("CanOutQTY");
 
+                dtDtl.Columns.Add("SEOrderBillNo");
+                dtDtl.Columns.Add("SEOrderInterID");
+                dtDtl.Columns.Add("SEOrderEntryID");
 
                 string strTemp;
                 do
@@ -1047,8 +1075,16 @@ namespace ALFWebService
                     //FNoteD = strTemp.Substring(strTemp.IndexOf("|") + 1, strTemp.Length - strTemp.IndexOf("|") - 2);//FNoteD
                     strTemp = strTemp.Substring(strTemp.IndexOf("|") + 1);
                     FNoteD = strTemp.Substring(0, strTemp.IndexOf("]"));//FNoteD
-                    
-                    obj = SqlOperation(3, "SELECT A.FInterID,AE.FEntryID,AE.FItemID,MTL.FUnitID,AE.FQty,AE.FStockQty,AE.FQty - AE.FStockQty CanOutQTY,AE.FPrice,MTL.FBatchManager FROM SEOutStock A INNER JOIN SEOutStockEntry AE ON A.FInterID = AE.FInterID INNER JOIN t_ICItem MTL ON AE.FItemID = MTL.FItemID WHERE A.FBillNo = '" + FSourceBillNo + "' AND MTL.FNumber = '" + FItem + "'");
+
+                    strSQL = @"SELECT A.FInterID,AE.FEntryID,AE.FItemID,MTL.FUnitID,AE.FQty,AE.FStockQty,AE.FQty - AE.FStockQty CanOutQTY,AE.FPrice,MTL.FBatchManager,ISNULL(B.FBillNo,'') SEOrderBillNo,ISNULL(B.FInterID,0) SEOrderInterID,ISNULL(BE.FEntryId,0) SEOrderEntryID
+                    FROM SEOutStock A
+                    INNER JOIN SEOutStockEntry AE ON A.FInterID = AE.FInterID
+                    INNER JOIN t_ICItem MTL ON AE.FItemID = MTL.FItemID
+                    LEFT JOIN SEOrder B ON AE.FOrderBillNo = B.FBillNo
+                    LEFT JOIN SEOrderEntry BE ON B.FInterID = BE.FInterID AND AE.FOrderEntryID = BE.FEntryID
+                    WHERE A.FBillNo = '" + FSourceBillNo + "' AND MTL.FNumber = '" + FItem + "'";
+
+                    obj = SqlOperation(3, strSQL);
                     if (obj == null || ((DataTable)obj).Rows.Count == 0)
                         //return "no@未找到源单对应的物料信息";
                         return "no@未找到物料信息[" + FSourceBillNo + "].[" + FItem + "]";
@@ -1061,6 +1097,10 @@ namespace ALFWebService
                     CanOutQTY = decimal.Parse(((DataTable)obj).Rows[0]["CanOutQTY"].ToString());//CanOutQTY
 
                     FBatchManager = ((DataTable)obj).Rows[0]["FBatchManager"].ToString() == "0" ? false : true;//是否采用业务批次管理
+
+                    SEOrderBillNo = ((DataTable)obj).Rows[0]["SEOrderBillNo"].ToString();
+                    SEOrderInterID= int.Parse(((DataTable)obj).Rows[0]["SEOrderInterID"].ToString());
+                    SEOrderEntryID= int.Parse(((DataTable)obj).Rows[0]["SEOrderEntryID"].ToString());
 
                     if (FQty > CanOutQTY)
                     {
@@ -1111,6 +1151,10 @@ namespace ALFWebService
                     dr["FNote"] = FNoteD;
                     dr["CanOutQTY"] = CanOutQTY;
 
+                    dr["SEOrderBillNo"] = SEOrderBillNo;
+                    dr["SEOrderInterID"] = SEOrderInterID;
+                    dr["SEOrderEntryID"] = SEOrderEntryID;
+
                     dtDtl.Rows.Add(dr);
                 }
                 while (pDetails.Length > 0);
@@ -1152,6 +1196,25 @@ namespace ALFWebService
             }
             #endregion
 
+            #region 对即时库存的判断
+
+            for (int i = 0; i < dtDtl.Rows.Count; i++)
+            {
+                if (dtDtl.Rows[i]["FDCSPID"] == null || dtDtl.Rows[i]["FDCSPID"].ToString() == "0")
+                    strSQL = "SELECT FQty FROM ICInventory WHERE FItemID = " + dtDtl.Rows[i]["FItemID"].ToString() + " AND FStockID = " + dtDtl.Rows[i]["FDCStockID"].ToString() + " AND FBatchNo = '" + dtDtl.Rows[i]["FBatchNo"].ToString() + "'";
+                else
+                    strSQL = "SELECT FQty FROM ICInventory WHERE FItemID = " + dtDtl.Rows[i]["FItemID"].ToString() + " AND FStockID = " + dtDtl.Rows[i]["FDCStockID"].ToString() + " AND FStockPlaceID = " + dtDtl.Rows[i]["FDCSPID"].ToString() + " AND FBatchNo = '" + dtDtl.Rows[i]["FBatchNo"].ToString() + "'";
+
+                obj = SqlOperation(1, strSQL);
+
+                if (obj == null)
+                    return "no@" + "物料[" + dtDtl.Rows[i]["FItem"].ToString() + "]未能匹配到即时库存";
+
+                if ((decimal)obj < decimal.Parse(dtDtl.Rows[i]["FQty"].ToString()))
+                    return "no@" + "物料[" + dtDtl.Rows[i]["FItem"].ToString() + "]即时库存[" + ((decimal)obj).ToString() + "]小于出库数量[" + dtDtl.Rows[i]["FQty"].ToString() + "]";
+            }
+            #endregion
+
             #region 插入主表
             try
             {
@@ -1169,6 +1232,7 @@ namespace ALFWebService
                 cmdH.Parameters.Add("@FFManagerID", SqlDbType.Int);
                 cmdH.Parameters.Add("@FBillerID", SqlDbType.Int);
                 cmdH.Parameters.Add("@FOrgBillInterID", SqlDbType.Int);
+                cmdH.Parameters.Add("@FCustID", SqlDbType.Int);
 
                 cmdH.Parameters["@FInterID"].Value = FInterID;
                 cmdH.Parameters["@FBillNo"].Value = FBillNo;
@@ -1180,9 +1244,10 @@ namespace ALFWebService
                 cmdH.Parameters["@FFManagerID"].Value = FFManagerID;
                 cmdH.Parameters["@FBillerID"].Value = FBillerID;
                 cmdH.Parameters["@FOrgBillInterID"].Value = FOrgBillInterID;
+                cmdH.Parameters["@FCustID"].Value = FCustID;
 
-                strSQL = @"INSERT INTO dbo.ICStockBill(FInterID,FBillNo,FBrNo,FTranType,FROB,Fdate,FNote,FDeptID,   FSManagerID,FFManagerID,FBillerID,FSelTranType,FSaleStyle,FOrgBillInterID,FStatus,FCheckerID,FCheckDate)
-                VALUES (@FInterID,@FBillNo,'0',21,1,CONVERT(VARCHAR(10),GETDATE(),120),@FNote,@FDeptID, @FSManagerID,@FFManagerID,@FBillerID,83,102,@FOrgBillInterID,1,@FBillerID,GETDATE())";
+                strSQL = @"INSERT INTO dbo.ICStockBill(FInterID,FBillNo,FBrNo,FTranType,FROB,Fdate,FNote,FDeptID,   FSManagerID,FFManagerID,FBillerID,FSupplyID,FSelTranType,FSaleStyle,FOrgBillInterID,FStatus,FCheckerID,FCheckDate)
+                VALUES (@FInterID,@FBillNo,'0',21,1,CONVERT(VARCHAR(10),GETDATE(),120),@FNote,@FDeptID, @FSManagerID,@FFManagerID,@FBillerID,@FCustID,83,102,@FOrgBillInterID,1,@FBillerID,GETDATE())";
 
                 cmdH.CommandText = strSQL;
                 cmdH.ExecuteNonQuery();
@@ -1219,6 +1284,10 @@ namespace ALFWebService
             cmdD.Parameters.Add("@FAmount", SqlDbType.Decimal);
             cmdD.Parameters.Add("@FNote", SqlDbType.VarChar);
 
+            cmdD.Parameters.Add("@SEOrderBillNo", SqlDbType.VarChar);
+            cmdD.Parameters.Add("@SEOrderInterID", SqlDbType.Int);
+            cmdD.Parameters.Add("@SEOrderEntryID", SqlDbType.Int);
+
             for (int i = 0; i < dtDtl.Rows.Count; i++)
             {
                 try
@@ -1240,8 +1309,12 @@ namespace ALFWebService
                     cmdD.Parameters["@FAmount"].Value = dtDtl.Rows[i]["FAmount"].ToString();
                     cmdD.Parameters["@FNote"].Value = dtDtl.Rows[i]["FNote"].ToString();
 
-                    strSQL = @"INSERT INTO dbo.ICstockbillEntry(FInterID,FEntryID,FBrNo,FItemID,FBatchNo,FUnitID,FDCStockID,FDCSPID,FQty,FAuxQty,   FOutCommitQty,FOutSecCommitQty,FPrice,FAuxprice,FAmount,Fconsignprice,FconsignAmount,FSCBillNo,FSCBillInterID,FSourceBillNo,    FSourceInterId,FSourceEntryID,FSourceTranType,FChkPassItem,FNote)
-                    VALUES(@FInterID,@FEntryID,'0',@FItemID,@FBatchNo,@FUnitID,@FDCStockID,@FDCSPID,@FQty,@FQty,    @FQty,@FQty,@FPrice,@FPrice,@FAmount,@FPrice,@FAmount,@FSourceBillNo,@FSourceInterId,@FSourceBillNo,    @FSourceInterId,@FSourceEntryID,81,1058,@FNote)";
+                    cmdD.Parameters["@SEOrderBillNo"].Value = dtDtl.Rows[i]["SEOrderBillNo"].ToString();
+                    cmdD.Parameters["@SEOrderInterID"].Value = dtDtl.Rows[i]["SEOrderInterID"].ToString();
+                    cmdD.Parameters["@SEOrderEntryID"].Value = dtDtl.Rows[i]["SEOrderEntryID"].ToString();
+
+                    strSQL = @"INSERT INTO dbo.ICstockbillEntry(FInterID,FEntryID,FBrNo,FItemID,FBatchNo,FUnitID,FDCStockID,FDCSPID,FQty,FQtyMust,FAuxQty,FOutCommitQty,FOutSecCommitQty,FPrice,FAuxprice,FAmount,Fconsignprice,FconsignAmount,FSCBillNo,FSCBillInterID,FSourceBillNo,    FSourceInterId,FSourceEntryID,FSourceTranType,FChkPassItem,FNote,   FOrderBillNo,FOrderInterID,FOrderEntryID,FSEOutBillNo,FSEOutInterID,FSEOutEntryID)
+                    VALUES(@FInterID,@FEntryID,'0',@FItemID,@FBatchNo,@FUnitID,@FDCStockID,@FDCSPID,@FQty,@FQty,@FQty,@FQty,@FQty,@FPrice,@FPrice,@FAmount,@FPrice,@FAmount,@FSourceBillNo,@FSourceInterId,@FSourceBillNo,    @FSourceInterId,@FSourceEntryID,83,1058,@FNote, @SEOrderBillNo,@SEOrderInterID,@SEOrderEntryID,@FSourceBillNo,@FSourceInterId,@FSourceEntryID)";
 
                     cmdD.CommandText = strSQL;
                     cmdD.ExecuteNonQuery();
@@ -1270,7 +1343,8 @@ namespace ALFWebService
                         THEN UPDATE SET FQty = IC.FQty - DT.FQty
                     WHEN NOT MATCHED
                         THEN INSERT(FBrNo,FItemID,FStockID,FQty) VALUES(0,DT.FItemID,DT.FStockID,DT.FQty);
-                    UPDATE SEOutStockEntry SET FStockQty =  FStockQty + " + dtDtl.Rows[i]["FQty"].ToString() + ",FAuxStockQty = FAuxStockQty + " + dtDtl.Rows[i]["FQty"].ToString() + ",FAuxCommitQty = FAuxCommitQty +" + dtDtl.Rows[i]["FQty"].ToString() + " WHERE FInterID = " + dtDtl.Rows[i]["FInterID"].ToString() + " AND FEntryID = " + dtDtl.Rows[i]["FEntryID"].ToString() + ";";
+                    UPDATE SEOutStockEntry SET FStockQty =  FStockQty + " + dtDtl.Rows[i]["FQty"].ToString() + ",FAuxStockQty = FAuxStockQty + " + dtDtl.Rows[i]["FQty"].ToString() + ",FAuxCommitQty = FAuxCommitQty +" + dtDtl.Rows[i]["FQty"].ToString() + " WHERE FInterID = " + dtDtl.Rows[i]["FInterID"].ToString() + " AND FEntryID = " + dtDtl.Rows[i]["FEntryID"].ToString() + @";
+                    UPDATE SEOrderEntry SET FStockQty =  FStockQty + " + dtDtl.Rows[i]["FQty"].ToString() + ",FAuxStockQty = FAuxStockQty + " + dtDtl.Rows[i]["FQty"].ToString() + ",FAuxCommitQty = FAuxCommitQty +" + dtDtl.Rows[i]["FQty"].ToString() + " WHERE FInterID = " + dtDtl.Rows[i]["SEOrderInterID"].ToString() + " AND FEntryID = " + dtDtl.Rows[i]["SEOrderEntryID"].ToString() + ";";
                 else
                     strSQL = @"MERGE INTO ICInventory AS IC
                     USING
@@ -1281,7 +1355,8 @@ namespace ALFWebService
                         THEN UPDATE SET FQty = IC.FQty - DT.FQty
                     WHEN NOT MATCHED
                         THEN INSERT(FBrNo,FItemID,FStockID,FQty) VALUES(0,DT.FItemID,DT.FStockID,-DT.FQty);
-                    UPDATE SEOutStockEntry SET FStockQty =  FStockQty + " + dtDtl.Rows[i]["FQty"].ToString() + ",FAuxStockQty = FAuxStockQty + " + dtDtl.Rows[i]["FQty"].ToString() + ",FAuxCommitQty = FAuxCommitQty +" + dtDtl.Rows[i]["FQty"].ToString() + " WHERE FInterID = " + dtDtl.Rows[i]["FInterID"].ToString() + " AND FEntryID = " + dtDtl.Rows[i]["FEntryID"].ToString() + ";";
+                    UPDATE SEOutStockEntry SET FStockQty =  FStockQty + " + dtDtl.Rows[i]["FQty"].ToString() + ",FAuxStockQty = FAuxStockQty + " + dtDtl.Rows[i]["FQty"].ToString() + ",FAuxCommitQty = FAuxCommitQty +" + dtDtl.Rows[i]["FQty"].ToString() + " WHERE FInterID = " + dtDtl.Rows[i]["FInterID"].ToString() + " AND FEntryID = " + dtDtl.Rows[i]["FEntryID"].ToString() + @";
+                    UPDATE SEOrderEntry SET FStockQty =  FStockQty + " + dtDtl.Rows[i]["FQty"].ToString() + ",FAuxStockQty = FAuxStockQty + " + dtDtl.Rows[i]["FQty"].ToString() + ",FAuxCommitQty = FAuxCommitQty +" + dtDtl.Rows[i]["FQty"].ToString() + " WHERE FInterID = " + dtDtl.Rows[i]["SEOrderInterID"].ToString() + " AND FEntryID = " + dtDtl.Rows[i]["SEOrderEntryID"].ToString() + ";";
 
                 SqlOperation(0, strSQL);
             }
