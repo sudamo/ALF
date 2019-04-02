@@ -461,7 +461,7 @@ namespace ALFWebService
                 cmdH.Parameters["@FHeadSelfP0256"].Value = FHeadSelfP0256;
 
                 strSQL = @"INSERT INTO dbo.ICStockBill(FInterID,FBillNo,FBrNo,FTranType,FROB,FNote,FDate,FDeptID,FSupplyID,FPurposeID,   FSManagerID,FFManagerID,FBillerID,FCheckerID,FCheckDate,FStatus,FSelTranType,FPOMode,FPOStyle,FOrgBillInterID,FPOOrdBillNo,FHeadSelfA0143,FHeadSelfA0144) 
-                VALUES (@FInterID,@FBillNo,'0',1,1,@FNote,CONVERT(VARCHAR(10),GETDATE(),120),@FDeptID,@FSupplyID,0,  @FSManagerID,@FFManagerID,@FBillerID,@FBillerID,GETDATE(),1,71,36680,252,@FOrgBillInterID,@FPOOrderBillNo,@FHeadSelfP0255,@FHeadSelfP0256)";
+                VALUES (@FInterID,@FBillNo,'0',1,1,@FNote,CONVERT(VARCHAR(10),GETDATE(),120),@FDeptID,@FSupplyID,0,  @FSManagerID,@FFManagerID,@FBillerID,@FBillerID,GETDATE(),1,71,36680,252,0,@FPOOrderBillNo,@FHeadSelfP0255,@FHeadSelfP0256)";
 
                 cmdH.CommandText = strSQL;
                 cmdH.ExecuteNonQuery();
@@ -1247,7 +1247,7 @@ namespace ALFWebService
                 cmdH.Parameters["@FCustID"].Value = FCustID;
 
                 strSQL = @"INSERT INTO dbo.ICStockBill(FInterID,FBillNo,FBrNo,FTranType,FROB,Fdate,FNote,FDeptID,   FSManagerID,FFManagerID,FBillerID,FSupplyID,FSelTranType,FSaleStyle,FOrgBillInterID,FStatus,FCheckerID,FCheckDate)
-                VALUES (@FInterID,@FBillNo,'0',21,1,CONVERT(VARCHAR(10),GETDATE(),120),@FNote,@FDeptID, @FSManagerID,@FFManagerID,@FBillerID,@FCustID,83,102,@FOrgBillInterID,1,@FBillerID,GETDATE())";
+                VALUES (@FInterID,@FBillNo,'0',21,1,CONVERT(VARCHAR(10),GETDATE(),120),@FNote,@FDeptID, @FSManagerID,@FFManagerID,@FBillerID,@FCustID,83,102,0,1,@FBillerID,GETDATE())";
 
                 cmdH.CommandText = strSQL;
                 cmdH.ExecuteNonQuery();
@@ -1329,7 +1329,7 @@ namespace ALFWebService
             }
             #endregion
 
-            #region 反写库存和发货通知单
+            #region 反写库存、销售订单和发货通知单
 
             for (int i = 0; i < dtDtl.Rows.Count; i++)
             {

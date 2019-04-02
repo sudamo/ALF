@@ -1,6 +1,6 @@
 
 SELECT * FROM T_TABLEDESCRIPTION WHERE FDESCRIPTION LIKE '%发货通知%'
-SELECT * FROM t_FieldDescription where FTableID = 210009 AND FDescription LIKE '%销售%' order by ffieldname
+SELECT * FROM t_FieldDescription where FTableID = 210009 AND FDescription LIKE '%项目%' order by ffieldname
 SELECT * FROM ICBillNo WHERE fbillid = 81 or FBillName LIKE '%发货通知%'
 
 select top 100 * from SEOutstock order by finterid desc
@@ -104,3 +104,5 @@ update [10.143.10.10].AIS20190305161000.dbo.ICStockBillentry set
 	FEntrySelfB0174='N'
 where finterid = 2608
 
+
+select top 100 fobjectitem from icstockbill where fobjectitem <> 0
