@@ -9,10 +9,10 @@ namespace ALFWebService
     static class Common
     {
         #region STATIC
-        private static string C_CONNECTIONSTRING;
+        private static string _ConnectionString;
         static Common()
         {
-            C_CONNECTIONSTRING = ConfigurationManager.AppSettings["C_CONNECTIONSTRING"];
+            _ConnectionString = ConfigurationManager.AppSettings["ConnectionString"];
         }
         #endregion
 
@@ -24,7 +24,7 @@ namespace ALFWebService
         public static string TestConnection()
         {
             bool bReturn = false;
-            SqlConnection conn = new SqlConnection(C_CONNECTIONSTRING);
+            SqlConnection conn = new SqlConnection(_ConnectionString);
             try
             {
                 conn.Open();
@@ -185,10 +185,11 @@ namespace ALFWebService
         /// <summary>
         /// 外购入库单
         /// </summary>
+        /// <param name="pProName">项目名称</param>
         /// <param name="pHead">表头：FDeptID|FSManagerID|FFManagerID|FBillerID|FPOOrderBillNo|FNote</param>
         /// <param name="pDetails">表体：[FItemNumber|FDCStockNumber|FDCSPNumber|FBatchNo|FQty|FSourceBillNo|FNote],......</param>
         /// <returns>yes@ID:xxxx;Number:xxxx/no@ExceptionMessage</returns>
-        public static string ICStockBillForPO(string pHead, string pDetails)
+        public static string ICStockBillForPO(string pProName, string pHead, string pDetails)
         {
             object obj;
             string strSQL;
@@ -196,13 +197,22 @@ namespace ALFWebService
             DataRow dr;
             SqlConnection conn;
 
-            if (pHead.Trim() == string.Empty || pDetails.Trim() == string.Empty)
+            if (pHead.Trim() == string.Empty || pDetails.Trim() == string.Empty || pProName.Trim() == string.Empty)
                 return "no@x000:参数必填。";
+
+            strSQL = "SELECT FNumber FROM t_Item WHERE FItemClassID = 3002 AND FNAME = '" + pProName + "'";
+            string strProNumber;
+            obj = SqlOperation(1, strSQL).ToString();
+            if (obj == null || obj.ToString() == "")
+            {
+                return "no@x005:查询项目编号失败。";
+            }
+            strProNumber = obj.ToString();
 
             int FInterID;
             string FBillNo;
 
-            GetICMaxIDAndBillNo(1, out FInterID, out FBillNo);
+            GetICMaxIDAndBillNo(1, strProNumber, out FInterID, out FBillNo);
 
             if (FBillNo.IndexOf("Error") >= 0)
                 return "no@x001:" + FBillNo;
@@ -421,7 +431,7 @@ namespace ALFWebService
             }
             #endregion
 
-            conn = new SqlConnection(C_CONNECTIONSTRING);
+            conn = new SqlConnection(_ConnectionString);
 
             #region 插入主表
             try
@@ -594,7 +604,7 @@ namespace ALFWebService
             int FInterID;
             string FBillNo;
 
-            GetICMaxIDAndBillNo(41, out FInterID, out FBillNo);
+            GetICMaxIDAndBillNo(41, "", out FInterID, out FBillNo);
 
             if (FBillNo.IndexOf("Error") >= 0)
                 return "no@x001:" + FBillNo;
@@ -820,7 +830,7 @@ namespace ALFWebService
             }
             #endregion
 
-            conn = new SqlConnection(C_CONNECTIONSTRING);
+            conn = new SqlConnection(_ConnectionString);
 
             #region 插入表头
             try
@@ -952,10 +962,11 @@ namespace ALFWebService
         /// <summary>
         /// 销售出库单
         /// </summary>
+        /// <param name="pProName">项目名称</param>
         /// <param name="pHead">表头：FDeptID|FSManagerID|FFManagerID|FBillerID|FSourceBillNo|FNote</param>
         /// <param name="pDetails">表体：[FItemNumber|FDCStockNumber|FDCSPNumber|FBatchNo|FQty|FSourceBillNo|FNote],......</param>
         /// <returns>yes@ID:xxxx;Number:xxxx/no@ExceptionMessage</returns>
-        public static string ICStockBillForXOut(string pHead, string pDetails)
+        public static string ICStockBillForXOut(string pProName, string pHead, string pDetails)
         {
             object obj;
             string strSQL;
@@ -963,18 +974,27 @@ namespace ALFWebService
             DataRow dr;
             SqlConnection conn;
 
-            if (pHead.Trim() == string.Empty || pDetails.Trim() == string.Empty)
+            if (pHead.Trim() == string.Empty || pDetails.Trim() == string.Empty || pProName.Trim() == string.Empty)
                 return "no@x000:参数必填。";
+
+            strSQL = "SELECT FNumber FROM t_Item WHERE FItemClassID = 3002 AND FNAME = '" + pProName + "'";
+            string strProNumber;
+            obj = SqlOperation(1, strSQL).ToString();
+            if (obj == null || obj.ToString() == "")
+            {
+                return "no@x005:查询项目编号失败。";
+            }
+            strProNumber = obj.ToString();
 
             int FInterID;
             string FBillNo;
 
-            GetICMaxIDAndBillNo(21, out FInterID, out FBillNo);
+            GetICMaxIDAndBillNo(21, strProNumber, out FInterID, out FBillNo);
 
             if (FBillNo.IndexOf("Error") >= 0)
                 return "no@x001:" + FBillNo;
 
-            conn = new SqlConnection(C_CONNECTIONSTRING);
+            conn = new SqlConnection(_ConnectionString);
 
             //销售订单：SEOrder
             string SEOrderBillNo;
@@ -1329,7 +1349,7 @@ namespace ALFWebService
             }
             #endregion
 
-            #region 反写库存、销售订单和发货通知单
+            #region 反写库存、发货通知单和销售订单
 
             for (int i = 0; i < dtDtl.Rows.Count; i++)
             {
@@ -1377,9 +1397,9 @@ namespace ALFWebService
         /// <param name="pFBillType">FTranType</param>
         /// <param name="pFInterID">最大内码</param>
         /// <param name="pFBillNo">新的单据编码</param>
-        private static void GetICMaxIDAndBillNo(int pFBillType, out int pFInterID, out string pFBillNo)
+        private static void GetICMaxIDAndBillNo(int pFBillType, string pProNumber, out int pFInterID, out string pFBillNo)
         {
-            SqlConnection conn = new SqlConnection(C_CONNECTIONSTRING);
+            SqlConnection conn = new SqlConnection(_ConnectionString);
             try
             {
                 conn.Open();
@@ -1406,9 +1426,11 @@ namespace ALFWebService
 
                 cmd2.CommandType = CommandType.StoredProcedure;
                 cmd2.Parameters.Add("@FBillType", SqlDbType.Int);
+                cmd2.Parameters.Add("@ProNumber", SqlDbType.VarChar);
                 cmd2.Parameters.Add("@BillNo", SqlDbType.VarChar, 50);
 
                 cmd2.Parameters["@FBillType"].Value = pFBillType;
+                cmd2.Parameters["@ProNumber"].Value = pProNumber;
                 cmd2.Parameters["@BillNo"].Direction = ParameterDirection.Output;
 
                 cmd2.ExecuteNonQuery();
@@ -1521,7 +1543,7 @@ namespace ALFWebService
             DataTable dt;
             DataSet ds;
 
-            SqlConnection conn = new SqlConnection(C_CONNECTIONSTRING);
+            SqlConnection conn = new SqlConnection(_ConnectionString);
 
             try
             {
