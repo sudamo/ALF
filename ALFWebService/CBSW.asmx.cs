@@ -43,9 +43,9 @@ namespace ALFWebService
         /// <param name="pDetails">表体：[FItemNumber|FDCStockNumber|FDCSPNumber|FBatchNo|FQty|FSourceBillNo|FNote],......</param>
         /// <returns>yes@ID:xxxx;Number:xxxx/no@ExceptionMessage</returns>
         [WebMethod]
-        public string ICStockBillForPO(string pProName, string pHead, string pDetails)
+        public string ICStockBillForPO(string pHead, string pDetails)
         {
-            return Common.ICStockBillForPO(pProName, pHead, pDetails);
+            return Common.ICStockBillForPO(pHead, pDetails);
         }
 
         /// <summary>

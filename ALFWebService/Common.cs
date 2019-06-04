@@ -189,7 +189,7 @@ namespace ALFWebService
         /// <param name="pHead">表头：FDeptID|FSManagerID|FFManagerID|FBillerID|FPOOrderBillNo|FNote</param>
         /// <param name="pDetails">表体：[FItemNumber|FDCStockNumber|FDCSPNumber|FBatchNo|FQty|FSourceBillNo|FNote],......</param>
         /// <returns>yes@ID:xxxx;Number:xxxx/no@ExceptionMessage</returns>
-        public static string ICStockBillForPO(string pProName, string pHead, string pDetails)
+        public static string ICStockBillForPO(string pHead, string pDetails)
         {
             object obj;
             string strSQL;
@@ -197,25 +197,25 @@ namespace ALFWebService
             DataRow dr;
             SqlConnection conn;
 
-            if (pHead.Trim() == string.Empty || pDetails.Trim() == string.Empty || pProName.Trim() == string.Empty)
-                return "no@x000:参数必填。";
+            //if (pHead.Trim() == string.Empty || pDetails.Trim() == string.Empty || pProName.Trim() == string.Empty)
+            //    return "no@x000:参数必填。";
 
-            strSQL = "SELECT FNumber FROM t_Item WHERE FItemClassID = 3002 AND FNAME = '" + pProName + "'";
+            //strSQL = "SELECT FNumber FROM t_Item WHERE FItemClassID = 3002 AND FNAME = '" + pProName + "'";
             string strProNumber;
-            obj = SqlOperation(1, strSQL).ToString();
-            if (obj == null || obj.ToString() == "")
-            {
-                return "no@x005:查询项目编号失败。";
-            }
-            strProNumber = obj.ToString();
+            //obj = SqlOperation(1, strSQL).ToString();
+            //if (obj == null || obj.ToString() == "")
+            //{
+            //    return "no@x005:查询项目编号失败。";
+            //}
+            //strProNumber = obj.ToString();
 
             int FInterID;
             string FBillNo;
 
-            GetICMaxIDAndBillNo(1, strProNumber, out FInterID, out FBillNo);
+            //GetICMaxIDAndBillNo(1, strProNumber, out FInterID, out FBillNo);
 
-            if (FBillNo.IndexOf("Error") >= 0)
-                return "no@x001:" + FBillNo;
+            //if (FBillNo.IndexOf("Error") >= 0)
+            //    return "no@x001:" + FBillNo;
 
             //POOrder
             int POFInterID, POFEntryID;
@@ -248,12 +248,26 @@ namespace ALFWebService
                 //
                 FNote = pHead.Substring(pHead.IndexOf("|") + 1);//备注
 
-                strSQL = "SELECT FInterID,FSupplyID,FHeadSelfP0255,ISNULL(FHeadSelfP0256,5367) FHeadSelfP0256 FROM POOrder WHERE FBillNo = '" + FPOOrderBillNo + "'";
+                //strSQL = "SELECT FInterID,FSupplyID,FHeadSelfP0255,ISNULL(FHeadSelfP0256,5367) FHeadSelfP0256 FROM POOrder WHERE FBillNo = '" + FPOOrderBillNo + "'";
                 //obj = SqlOperation(3, "SELECT FInterID,FSupplyID FROM POOrder WHERE FBillNo = '" + FPOOrderBillNo + "'");
+                strSQL = @"SELECT PO.FInterID,PO.FSupplyID,PO.FHeadSelfP0255,ISNULL(PO.FHeadSelfP0256,5367) FHeadSelfP0256,ISNULL(TI.FNumber,'') ProNumber
+                FROM POOrder PO
+                LEFT JOIN t_Item TI ON PO.FHeadSelfP0255 = TI.FItemID AND TI.FItemClassID = 3002
+                WHERE PO.FBillNo = '" + FPOOrderBillNo + "'";
 
                 obj = SqlOperation(3, strSQL);
                 if (obj == null || ((DataTable)obj).Rows.Count == 0)
                     return "no@没有此采购订单数据[" + FPOOrderBillNo + "]";
+
+                //项目号验证
+                strProNumber = ((DataTable)obj).Rows[0]["ProNumber"].ToString();
+                if(strProNumber.Equals(string.Empty))
+                {
+                    return "no@x005:查询项目编号失败。";
+                }
+                GetICMaxIDAndBillNo(1, strProNumber, out FInterID, out FBillNo);
+                if (FBillNo.IndexOf("Error") >= 0)
+                    return "no@x001:" + FBillNo;
 
                 POFInterIDH = int.Parse(((DataTable)obj).Rows[0]["FInterID"].ToString());
                 FSupplyID = int.Parse(((DataTable)obj).Rows[0]["FSupplyID"].ToString());
