@@ -38,7 +38,6 @@ namespace ALFWebService
         /// <summary>
         /// 外购入库单
         /// </summary>
-        /// <param name="pProName">项目名称</param>
         /// <param name="pHead">表头：FDeptID|FSManagerID|FFManagerID|FBillerID|FPOOrderBillNo|FNote</param>
         /// <param name="pDetails">表体：[FItemNumber|FDCStockNumber|FDCSPNumber|FBatchNo|FQty|FSourceBillNo|FNote],......</param>
         /// <returns>yes@ID:xxxx;Number:xxxx/no@ExceptionMessage</returns>
@@ -63,14 +62,13 @@ namespace ALFWebService
         /// <summary>
         /// 销售出库单
         /// </summary>
-        /// <param name="pProName">项目名称</param>
         /// <param name="pHead">表头：FDeptID|FSManagerID|FFManagerID|FBillerID|FSourceBillNo|FNote</param>
         /// <param name="pDetails">表体：[FItemNumber|FDCStockNumber|FDCSPNumber|FBatchNo|FQty|FSourceBillNo|FNote],......</param>
         /// <returns>yes@ID:xxxx;Number:xxxx/no@ExceptionMessage</returns>
         [WebMethod]
-        public string ICStockBillForXOut(string pProName, string pHead, string pDetails)
+        public string ICStockBillForXOut(string pHead, string pDetails)
         {
-            return Common.ICStockBillForXOut(pProName, pHead, pDetails);
+            return Common.ICStockBillForXOut(pHead, pDetails);
         }
     }
 }

@@ -185,7 +185,6 @@ namespace ALFWebService
         /// <summary>
         /// 外购入库单
         /// </summary>
-        /// <param name="pProName">项目名称</param>
         /// <param name="pHead">表头：FDeptID|FSManagerID|FFManagerID|FBillerID|FPOOrderBillNo|FNote</param>
         /// <param name="pDetails">表体：[FItemNumber|FDCStockNumber|FDCSPNumber|FBatchNo|FQty|FSourceBillNo|FNote],......</param>
         /// <returns>yes@ID:xxxx;Number:xxxx/no@ExceptionMessage</returns>
@@ -976,11 +975,10 @@ namespace ALFWebService
         /// <summary>
         /// 销售出库单
         /// </summary>
-        /// <param name="pProName">项目名称</param>
         /// <param name="pHead">表头：FDeptID|FSManagerID|FFManagerID|FBillerID|FSourceBillNo|FNote</param>
         /// <param name="pDetails">表体：[FItemNumber|FDCStockNumber|FDCSPNumber|FBatchNo|FQty|FSourceBillNo|FNote],......</param>
         /// <returns>yes@ID:xxxx;Number:xxxx/no@ExceptionMessage</returns>
-        public static string ICStockBillForXOut(string pProName, string pHead, string pDetails)
+        public static string ICStockBillForXOut(string pHead, string pDetails)
         {
             object obj;
             string strSQL;
@@ -988,25 +986,25 @@ namespace ALFWebService
             DataRow dr;
             SqlConnection conn;
 
-            if (pHead.Trim() == string.Empty || pDetails.Trim() == string.Empty || pProName.Trim() == string.Empty)
-                return "no@x000:参数必填。";
+            //if (pHead.Trim() == string.Empty || pDetails.Trim() == string.Empty || pProName.Trim() == string.Empty)
+            //    return "no@x000:参数必填。";
 
-            strSQL = "SELECT FNumber FROM t_Item WHERE FItemClassID = 3002 AND FNAME = '" + pProName + "'";
+            //strSQL = "SELECT FNumber FROM t_Item WHERE FItemClassID = 3002 AND FNAME = '" + pProName + "'";
             string strProNumber;
-            obj = SqlOperation(1, strSQL).ToString();
-            if (obj == null || obj.ToString() == "")
-            {
-                return "no@x005:查询项目编号失败。";
-            }
-            strProNumber = obj.ToString();
+            //obj = SqlOperation(1, strSQL).ToString();
+            //if (obj == null || obj.ToString() == "")
+            //{
+            //    return "no@x005:查询项目编号失败。";
+            //}
+            //strProNumber = obj.ToString();
 
             int FInterID;
             string FBillNo;
 
-            GetICMaxIDAndBillNo(21, strProNumber, out FInterID, out FBillNo);
+            //GetICMaxIDAndBillNo(21, strProNumber, out FInterID, out FBillNo);
 
-            if (FBillNo.IndexOf("Error") >= 0)
-                return "no@x001:" + FBillNo;
+            //if (FBillNo.IndexOf("Error") >= 0)
+            //    return "no@x001:" + FBillNo;
 
             conn = new SqlConnection(_ConnectionString);
 
@@ -1044,10 +1042,26 @@ namespace ALFWebService
                 FSEOutStockBillNo = pHead.Substring(0, pHead.IndexOf("|"));//SEOutStockBillNo
                 //
                 FNote = pHead.Substring(pHead.IndexOf("|") + 1);//FNote
-                
-                obj = SqlOperation(3, "SELECT FInterID,FClosed,FCustID FROM SEOutStock WHERE FBillNo = '" + FSEOutStockBillNo + "'");
+
+                strSQL = @"SELECT SO.FInterID,SO.FClosed,SO.FCustID,ISNULL(TI.FNumber,'') ProNumber
+                FROM SEOutStock SO
+                LEFT JOIN t_Item TI ON SO.FHeadSelfS0238  = TI.FItemID AND TI.FItemClassID = 3002
+                WHERE SO.FBillNo = '" + FSEOutStockBillNo + "'";
+
+                obj = SqlOperation(3, strSQL);
                 if (obj == null || ((DataTable)obj).Rows.Count == 0)
                     return "no@没有此单据数据[" + FSEOutStockBillNo + "]";
+
+                //项目号验证
+                strProNumber = ((DataTable)obj).Rows[0]["ProNumber"].ToString();
+                if (strProNumber.Equals(string.Empty))
+                {
+                    return "no@x005:查询项目编号失败。";
+                }
+                GetICMaxIDAndBillNo(21, strProNumber, out FInterID, out FBillNo);
+
+                if (FBillNo.IndexOf("Error") >= 0)
+                    return "no@x001:" + FBillNo;
 
                 //FConsignee = ((DataTable)obj).Rows[0]["FConsignee"].ToString();//收货方
                 FOrgBillInterID = int.Parse(((DataTable)obj).Rows[0]["FInterID"].ToString());
